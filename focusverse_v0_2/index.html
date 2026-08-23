@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FocusVerse — V0.2</title>
+  <link rel="stylesheet" href="styles/app.css">
+</head>
+<body>
+  <header>
+    <div>
+      <h1>FOCUSVERSE</h1>
+      <span>V0.2 — Foundation</span>
+    </div>
+    <button class="secondary" id="reset" type="button">Sıfırla</button>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="card">
+        <div class="kicker">REAL LIFE → DIGITAL WORLD</div>
+        <h2>Bugünün ilerlemesi,<br>dünyanın büyümesi.</h2>
+        <p>Görevlerini tamamla, XP kazan ve kendi dijital evrenini geliştir. Bu sürüm ürünün temel döngüsünü daha sağlam bir mimariye taşıyor.</p>
+        <div class="stats" aria-label="İlerleme istatistikleri">
+          <div class="stat"><b id="xp">0</b><small>Toplam XP</small></div>
+          <div class="stat"><b id="level">1</b><small>Seviye</small></div>
+          <div class="stat"><b id="done">0</b><small>Tamamlanan</small></div>
+        </div>
+      </div>
+      <div class="card world" aria-label="FocusVerse gezegeni">
+        <div class="orbit" aria-hidden="true"></div>
+        <div class="planet" id="planet" aria-hidden="true"></div>
+        <div class="planet-items" id="planet-items" aria-label="Gezegen yapıları"></div>
+      </div>
+    </section>
+
+    <div id="level-up-notification" class="level-up-notification" role="status" aria-live="polite"></div>
+
+    <dialog id="reward-modal" class="reward-modal">
+      <form method="dialog">
+        <div class="kicker">YENİ BİR GELİŞİM</div>
+        <h3>Gezegen Ödülü Seç</h3>
+        <p><strong data-reward-level></strong>. seviyeye ulaştın. Gezegenine bir yapı ekle.</p>
+        <div class="reward-options">
+          <button type="button" class="reward-option" data-reward="nature"><span aria-hidden="true">🌱</span><strong>Doğa Bölgesi</strong><small>Gezegenin yaşam enerjisini artırır</small></button>
+          <button type="button" class="reward-option" data-reward="energy"><span aria-hidden="true">⚡</span><strong>Enerji Santrali</strong><small>Yeni yapıların gücünü besler</small></button>
+          <button type="button" class="reward-option" data-reward="satellite"><span aria-hidden="true">🛰️</span><strong>Yörünge Uydusu</strong><small>Gezegenin yörüngesini genişletir</small></button>
+        </div>
+      </form>
+    </dialog>
+
+    <section class="card section">
+      <h3>⚔️ Bugünün görevleri</h3>
+      <div class="row">
+        <label class="sr-only" for="taskInput">Yeni görev</label>
+        <input id="taskInput" placeholder="Örn. 30 dakika matematik çalış" maxlength="100" autocomplete="off">
+        <label class="sr-only" for="task-difficulty">Zorluk seviyesi</label>
+        <select id="task-difficulty">
+          <option value="easy">Kolay</option>
+          <option value="medium" selected>Orta</option>
+          <option value="hard">Zor</option>
+        </select>
+        <button class="btn primary" id="add" type="button">Görev ekle</button>
+      </div>
+      <div id="tasks" class="tasks" aria-live="polite"></div>
+    </section>
+
+    <section class="card section mentor">
+      <div>
+        <div class="kicker">AI MENTOR / DEMO</div>
+        <h3>Bugünkü durumun</h3>
+        <p id="mentor" class="quote">“İlk görevi ekle. Sonra küçük bir zafer kazan.”</p>
+        <button class="secondary" id="mentorBtn" type="button">Bana bir sonraki adımı söyle</button>
+      </div>
+      <div>
+        <h3>🪐 Gezegen gelişimi</h3>
+        <p style="color:var(--muted)">XP arttıkça gezegenin enerjisi artıyor. Sonraki sürümlerde gerçek bölgeler ve açılabilir yapılar gelecek.</p>
+        <div class="bar" role="progressbar" aria-label="Sonraki seviye ilerlemesi" aria-valuemin="0" aria-valuemax="250" aria-valuenow="0">
+          <div class="fill" id="fill"></div>
+        </div>
+        <p id="progressText" style="color:var(--muted)">0 / 250 XP</p>
+      </div>
+    </section>
+
+    <div class="footer">FocusVerse — kişisel üretkenliği oyuna dönüştüren deneysel proje.</div>
+  </main>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>

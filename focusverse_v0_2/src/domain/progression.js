@@ -47,3 +47,17 @@ export function levelUpsBetweenXp(previousXp, currentXp) {
     (_, index) => previousLevel + index + 1
   );
 }
+
+export function progressionTransition(previousProgression, nextProgression) {
+  const previous = progressionFromXp(previousProgression?.totalXp);
+  const next = progressionFromXp(nextProgression?.totalXp);
+  const levels = levelUpsBetweenXp(previous.totalXp, next.totalXp);
+  return {
+    previousXp: previous.totalXp,
+    newXp: next.totalXp,
+    previousLevel: previous.level,
+    newLevel: next.level,
+    leveledUp: levels.length > 0,
+    levels
+  };
+}

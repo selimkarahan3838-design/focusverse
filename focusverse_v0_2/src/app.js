@@ -7,7 +7,7 @@ import { renderTasks } from './ui/renderTasks.js';
 import { bindEvents } from './ui/events.js';
 import { bindRewardModal } from './ui/rewardModal.js';
 import { claimReward, unlockRewards } from './domain/rewards.js';
-import { levelUpsBetweenXp, totalXp } from './domain/progression.js';
+import { progressionFromXp, progressionTransition, totalXp } from './domain/progression.js';
 
 const elements = {
   xp: document.getElementById('xp'),
@@ -75,11 +75,11 @@ bindRewardModal({
 function completeTaskAndUpdate(id) {
   const current = store.getState();
   const next = completeTask(current, id);
-  const levels = levelUpsBetweenXp(totalXp(current.tasks), totalXp(next.tasks));
-  store.setState({ ...next, rewards: unlockRewards(current.rewards, levels) });
-  if (levels.length) {
-    const level = levels[levels.length - 1];
-    showNotification(`Tebrikler! Seviye ${level}'e Ulaştın ve Gezegenin Büyüdü!`);
+  const nextProgression = progressionFromXp(totalXp(next.tasks));
+  const transition = progressionTransition(current.progression, nextProgression);
+  store.setState({ ...next, progression: nextProgression, rewards: unlockRewards(current.rewards, transition.levels) });
+  if (transition.leveledUp) {
+    showNotification(`Tebrikler! Seviye ${transition.newLevel}'e Ulaştın ve Gezegenin Büyüdü!`);
     showNextReward();
   }
 }

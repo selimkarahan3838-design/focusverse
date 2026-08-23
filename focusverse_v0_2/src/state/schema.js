@@ -1,5 +1,5 @@
 import { DIFFICULTIES } from '../domain/tasks.js';
-import { createRewardState, isRewardId } from '../domain/rewards.js';
+import { createRewardState, isRewardId, isRewardLevel, isRewardOptions } from '../domain/rewards.js';
 import { progressionFromXp } from '../domain/progression.js';
 
 export const CURRENT_VERSION = 3;
@@ -24,9 +24,18 @@ const isValidTask = (task) => (
 );
 
 const isValidUnlockedItem = item => isRewardId(item);
-const isValidRewardRecord = reward => reward && Number.isInteger(reward.level) && reward.level >= 0 && isRewardId(reward.id);
-const isValidAvailableReward = reward => isValidRewardRecord(reward) && Array.isArray(reward.options) && reward.options.every(isRewardId);
-const isValidRewards = rewards => rewards && Array.isArray(rewards.available) && Array.isArray(rewards.claimed) && rewards.available.every(isValidAvailableReward) && rewards.claimed.every(isValidRewardRecord);
+const hasDuplicate = values => new Set(values).size !== values.length;
+const isValidRewardRecord = reward => reward && isRewardLevel(reward.level) && isRewardId(reward.id);
+const isValidAvailableReward = reward => reward && isRewardLevel(reward.level) && isRewardOptions(reward.options);
+const isValidRewards = (rewards, unlockedItems = [], currentLevel = Number.POSITIVE_INFINITY) => {
+  if (!rewards || !Array.isArray(rewards.available) || !Array.isArray(rewards.claimed)) return false;
+  if (!rewards.available.every(isValidAvailableReward) || !rewards.claimed.every(isValidRewardRecord)) return false;
+  if ([...rewards.available, ...rewards.claimed].some(reward => reward.level > currentLevel)) return false;
+  if (hasDuplicate(rewards.available.map(reward => reward.level))) return false;
+  if (hasDuplicate(rewards.claimed.map(reward => reward.level))) return false;
+  if (rewards.available.some(available => rewards.claimed.some(claimed => claimed.level === available.level))) return false;
+  return rewards.claimed.every(reward => unlockedItems.includes(reward.id));
+};
 const isValidProgression = (progression, tasks) => {
   if (!progression || !Number.isFinite(progression.totalXp) || progression.totalXp < 0 || !Number.isInteger(progression.level) || progression.level < 1) return false;
   const expected = progressionFromXp(tasks.reduce((sum, task) => sum + (task.completed ? task.xp : 0), 0));
@@ -39,7 +48,7 @@ export function validateState(candidate) {
   if (!Array.isArray(candidate.tasks)) return false;
   if (!Array.isArray(candidate.unlockedItems)) return false;
   if (!candidate.tasks.every(isValidTask) || !candidate.unlockedItems.every(isValidUnlockedItem)) return false;
-  if (!isValidProgression(candidate.progression, candidate.tasks) || !isValidRewards(candidate.rewards)) return false;
+  if (hasDuplicate(candidate.unlockedItems) || !isValidProgression(candidate.progression, candidate.tasks) || !isValidRewards(candidate.rewards, candidate.unlockedItems, candidate.progression.level)) return false;
   return true;
 }
 
@@ -48,9 +57,13 @@ export function normalizeState(candidate) {
   const tasks = candidate.tasks.filter(isValidTask);
   const totalXp = tasks.reduce((sum, task) => sum + (task.completed ? task.xp : 0), 0);
   const progression = progressionFromXp(totalXp);
-  const unlockedItems = Array.isArray(candidate.unlockedItems) ? candidate.unlockedItems.filter(isValidUnlockedItem) : [];
-  const rewards = isValidRewards(candidate.rewards) ? candidate.rewards : createRewardState();
-  return { version: CURRENT_VERSION, tasks, unlockedItems, progression, rewards };
+  const unlockedItems = Array.isArray(candidate.unlockedItems)
+    ? [...new Set(candidate.unlockedItems.filter(isValidUnlockedItem))]
+    : [];
+  const rewardClaims = candidate.rewards?.claimed?.filter(isValidRewardRecord).map(reward => reward.id) || [];
+  const consistentUnlockedItems = [...new Set([...unlockedItems, ...rewardClaims])];
+  const rewards = isValidRewards(candidate.rewards, consistentUnlockedItems, progression.level) ? candidate.rewards : createRewardState();
+  return { version: CURRENT_VERSION, tasks, unlockedItems: consistentUnlockedItems, progression, rewards };
 }
 
 export function migrateLegacyState(raw) {

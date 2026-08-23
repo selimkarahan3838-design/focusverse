@@ -1,4 +1,4 @@
-import { DIFFICULTIES } from '../domain/tasks.js';
+import { DIFFICULTIES, XP_BY_DIFFICULTY } from '../domain/tasks.js';
 import { createRewardState, isRewardId, isRewardLevel, isRewardOptions } from '../domain/rewards.js';
 import { progressionFromXp } from '../domain/progression.js';
 
@@ -22,6 +22,41 @@ const isValidTask = (task) => (
   typeof task.createdAt === 'string' &&
   (task.completedAt === null || typeof task.completedAt === 'string')
 );
+
+function makeMigrationId(index) {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return `legacy-${Date.now()}-${index}`;
+}
+
+function migrationTimestamp(task) {
+  return typeof task.createdAt === 'string' && task.createdAt ? task.createdAt : new Date().toISOString();
+}
+
+function normalizeLegacyTask(task, index) {
+  if (!task || typeof task !== 'object') return null;
+  const title = typeof task.title === 'string' ? task.title : task.name;
+  if (typeof title !== 'string' || !title.trim()) return null;
+  const difficulty = DIFFICULTIES.includes(task.difficulty) ? task.difficulty : 'medium';
+  const numericXp = typeof task.xp === 'number' || (typeof task.xp === 'string' && task.xp.trim())
+    ? Number(task.xp)
+    : NaN;
+  const xp = Number.isFinite(numericXp) && numericXp >= 0
+    ? numericXp
+    : XP_BY_DIFFICULTY[difficulty];
+  const completed = typeof task.completed === 'boolean' ? task.completed : Boolean(task.done);
+  const createdAt = migrationTimestamp(task);
+  return {
+    id: typeof task.id === 'string' && task.id ? task.id : makeMigrationId(index),
+    title: title.trim().slice(0, 100),
+    difficulty,
+    xp,
+    completed,
+    createdAt,
+    completedAt: task.completedAt === null || typeof task.completedAt === 'string'
+      ? task.completedAt
+      : completed ? createdAt : null
+  };
+}
 
 const isValidUnlockedItem = item => isRewardId(item);
 const hasDuplicate = values => new Set(values).size !== values.length;
@@ -54,7 +89,7 @@ export function validateState(candidate) {
 
 export function normalizeState(candidate) {
   if (!candidate || typeof candidate !== 'object' || !Array.isArray(candidate.tasks)) return createInitialState();
-  const tasks = candidate.tasks.filter(isValidTask);
+  const tasks = candidate.tasks.map(normalizeLegacyTask).filter(isValidTask);
   const totalXp = tasks.reduce((sum, task) => sum + (task.completed ? task.xp : 0), 0);
   const progression = progressionFromXp(totalXp);
   const unlockedItems = Array.isArray(candidate.unlockedItems)
@@ -72,27 +107,17 @@ export function migrateLegacyState(raw) {
   if (!Array.isArray(raw.tasks)) return createInitialState();
 
   if (raw.version === 2 || raw.version === 1) {
-    const tasks = raw.tasks
-      .filter(task => task && typeof task.id === 'string' && typeof task.title === 'string')
-      .map(task => ({ ...task, difficulty: DIFFICULTIES.includes(task.difficulty) ? task.difficulty : 'medium' }))
-      .filter(isValidTask);
+    const tasks = raw.tasks.map(normalizeLegacyTask).filter(Boolean);
     const unlockedItems = Array.isArray(raw.unlockedItems)
       ? raw.unlockedItems.filter(isValidUnlockedItem)
       : [];
-    return normalizeState({ version: CURRENT_VERSION, tasks, unlockedItems, rewards: createRewardState() });
+    return normalizeState({ version: CURRENT_VERSION, tasks, unlockedItems, rewards: raw.rewards || createRewardState() });
   }
 
-  const tasks = raw.tasks
-    .filter(t => t && typeof t.name === 'string')
-    .map((t, i) => ({
-      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `legacy-${Date.now()}-${i}`,
-      title: t.name.trim().slice(0, 100),
-      xp: Number.isFinite(Number(t.xp)) ? Math.max(0, Math.round(Number(t.xp))) : 50,
-      difficulty: 'medium',
-      completed: Boolean(t.done),
-      createdAt: new Date().toISOString(),
-      completedAt: t.done ? new Date().toISOString() : null
-    }));
+  const tasks = raw.tasks.map(normalizeLegacyTask).filter(Boolean);
+  const unlockedItems = Array.isArray(raw.unlockedItems)
+    ? raw.unlockedItems.filter(isValidUnlockedItem)
+    : [];
 
-  return normalizeState({ version: CURRENT_VERSION, tasks, unlockedItems: [], rewards: createRewardState() });
+  return normalizeState({ version: CURRENT_VERSION, tasks, unlockedItems, rewards: raw.rewards || createRewardState() });
 }

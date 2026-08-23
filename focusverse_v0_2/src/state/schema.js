@@ -104,7 +104,12 @@ export function normalizeState(candidate) {
 export function migrateLegacyState(raw) {
   if (!raw || typeof raw !== 'object') return createInitialState();
   if (raw.version === CURRENT_VERSION) return normalizeState(raw);
-  if (!Array.isArray(raw.tasks)) return createInitialState();
+  if (!Array.isArray(raw.tasks)) {
+    const unlockedItems = Array.isArray(raw.unlockedItems)
+      ? raw.unlockedItems.filter(isValidUnlockedItem)
+      : [];
+    return normalizeState({ version: CURRENT_VERSION, tasks: [], unlockedItems, rewards: raw.rewards || createRewardState() });
+  }
 
   if (raw.version === 2 || raw.version === 1) {
     const tasks = raw.tasks.map(normalizeLegacyTask).filter(Boolean);

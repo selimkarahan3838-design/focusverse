@@ -4,6 +4,8 @@ import { normalizeState, validateState } from './schema.js';
 export function createStore({ onStorageError } = {}) {
   let state = loadState();
   const listeners = new Set();
+  const loadError = getStorageError();
+  if (loadError) onStorageError?.(loadError);
 
   return {
     getState: () => state,

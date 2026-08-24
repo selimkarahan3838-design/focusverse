@@ -1,4 +1,4 @@
-import { createTask, addTask, completeTask } from './domain/tasks.js';
+import { createTask, addTask, completeTask, removeTask, updateTask, reactivateTask } from './domain/tasks.js';
 import { getMentorMessage } from './domain/mentor.js';
 import { createStore } from './state/store.js';
 import { clearState } from './services/storage.js';
@@ -32,12 +32,22 @@ const elements = {
 
 let activeRewardLevel = null;
 let notificationTimeout;
+let editingTaskId = null;
 
 function showNotification(message) {
   elements.levelUpNotification.textContent = message;
   elements.levelUpNotification.classList.add('visible');
   clearTimeout(notificationTimeout);
   notificationTimeout = setTimeout(() => elements.levelUpNotification.classList.remove('visible'), 4500);
+}
+
+function applyTaskLifecycleGuard(current, nextState, message) {
+  const nextProgression = progressionFromXp(totalXp(nextState.tasks));
+  if (nextProgression.level < current.progression.level) {
+    showNotification(message);
+    return null;
+  }
+  return { ...nextState, progression: nextProgression };
 }
 
 const store = createStore({
@@ -84,9 +94,81 @@ function completeTaskAndUpdate(id) {
   }
 }
 
+function deleteTaskAndUpdate(id) {
+  const current = store.getState();
+  const next = removeTask(current, id);
+  if (next === current) return;
+  const guarded = applyTaskLifecycleGuard(
+    current,
+    next,
+    'Mevcut seviye düşeceği için görev silinemedi.'
+  );
+  if (!guarded) return;
+  store.setState(guarded);
+}
+
+function reactivateTaskAndUpdate(id) {
+  const current = store.getState();
+  const next = reactivateTask(current, id);
+  if (next === current) return;
+  const guarded = applyTaskLifecycleGuard(
+    current,
+    next,
+    'Mevcut seviye düşeceği için görev tekrar etkinleştirilemedi.'
+  );
+  if (!guarded) return;
+  store.setState(guarded);
+}
+
+function editTaskStart(id) {
+  editingTaskId = id;
+  render(store.getState());
+}
+
+function editTaskCancel() {
+  editingTaskId = null;
+  render(store.getState());
+}
+
+function editTaskSave(id, title, difficulty) {
+  const current = store.getState();
+  const cleanTitle = typeof title === 'string' ? title.trim() : '';
+  if (!cleanTitle) {
+    showNotification('Görev başlığı boş olamaz.');
+    return;
+  }
+
+  const next = updateTask(current, id, { title: cleanTitle, difficulty });
+  if (next === current) {
+    editingTaskId = null;
+    render(current);
+    return;
+  }
+
+  const guarded = applyTaskLifecycleGuard(
+    current,
+    next,
+    'Düzenleme işlemi mevcut seviye düşürmeyeceği için uygulanamadı.'
+  );
+  if (!guarded) return;
+
+  editingTaskId = null;
+  store.setState(guarded);
+}
+
 function render(state) {
   renderStats(state, elements);
-  renderTasks(state, elements.tasks, completeTaskAndUpdate);
+  renderTasks(
+    state,
+    elements.tasks,
+    completeTaskAndUpdate,
+    deleteTaskAndUpdate,
+    editTaskStart,
+    editTaskSave,
+    editTaskCancel,
+    reactivateTaskAndUpdate,
+    editingTaskId
+  );
   elements.mentor.textContent = getMentorMessage(state);
 }
 
